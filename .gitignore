@@ -1,0 +1,41 @@
+# Build
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# Variabili d'ambiente e credenziali
+.env
+*.env
+application-local.properties
+
+# Log
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
