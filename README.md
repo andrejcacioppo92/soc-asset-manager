@@ -46,9 +46,9 @@ cp .env.example .env
 
 5. Imposta le variabili d'ambiente (PowerShell):
 ```powershell
-$env:DB_USERNAME="postgres"
-$env:DB_PASSWORD="VirtualSEC92"
-$env:GEMINI_API_KEY="AIzaSyDedsgJIXQdo5Qwab8xtScSKXfVt4cyLyU"
+$env:DB_USERNAME="il_tuo_username"
+$env:DB_PASSWORD="la_tua_password"
+$env:GEMINI_API_KEY="la_tua_chiave_gemini"
 ```
 
 6. Avvia il server:
