@@ -1,4 +1,4 @@
-package com.cyberdefense.assetmanager.entity; 
+package com.cyberdefense.assetmanager.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -15,13 +15,17 @@ public class TicketVulnerabilita {
     private Long id;
 
     @Column(nullable = false, length = 500)
-    private String descrizione; 
+    private String descrizione;
 
+    // uso EnumType.STRING così nel DB vedo il nome dell'enum invece di un numero
+    // più leggibile se devo fare query a mano
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String gravita; 
+    private Gravita gravita;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String stato; 
+    private StatoTicket stato;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "asset_id", nullable = false)

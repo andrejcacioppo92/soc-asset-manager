@@ -14,7 +14,9 @@ public abstract class AssetIT {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    // l'IP deve essere unico nel sistema, non posso avere due asset con lo stesso indirizzo
+    // il vincolo è anche a livello DB così il database stesso blocca il duplicato
+    @Column(nullable = false, unique = true)
     private String indirizzoIp;
 
     @Column(nullable = false)

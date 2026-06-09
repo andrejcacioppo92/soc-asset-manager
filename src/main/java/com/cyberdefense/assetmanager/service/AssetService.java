@@ -24,7 +24,7 @@ public class AssetService {
         return assetRepository.findById(id);
     }
 
-    // Accetta sia Server che Firewall grazie al polimorfismo sull'entità astratta
+    // accetta sia Server che Firewall grazie al polimorfismo dell'entità astratta
     public AssetIT salva(AssetIT asset) {
         return assetRepository.save(asset);
     }
@@ -35,5 +35,11 @@ public class AssetService {
 
     public boolean esiste(Long id) {
         return assetRepository.existsById(id);
+    }
+
+    // controllo se un IP è già usato, mi serve nei controller prima di salvare
+    // così evito di duplicare lo stesso asset in inventario
+    public boolean ipGiaUsato(String indirizzoIp) {
+        return assetRepository.existsByIndirizzoIp(indirizzoIp);
     }
 }

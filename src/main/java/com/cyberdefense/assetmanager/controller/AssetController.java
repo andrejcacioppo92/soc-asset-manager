@@ -11,11 +11,13 @@ import com.cyberdefense.assetmanager.service.AssetService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/assets")
@@ -30,14 +32,10 @@ public class AssetController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'VIEWER')")
     public ResponseEntity<List<AssetResponseDTO>> getTuttiAsset() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            securityLogger.logViolazione("GET_ASSETS", "Tentativo di accesso non autenticato");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        securityLogger.logAccesso("GET_ASSETS", "Recupero lista completa asset");
+        securityLogger.logAccesso("GET_ASSETS", "Recupero lista completa asset da " + auth.getName());
 
         List<AssetResponseDTO> assets = assetService.trovatutti()
                 .stream()
@@ -48,14 +46,10 @@ public class AssetController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'VIEWER')")
     public ResponseEntity<AssetResponseDTO> getAssetPerId(@PathVariable Long id) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            securityLogger.logViolazione("GET_ASSET", "Tentativo di accesso non autenticato");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        securityLogger.logAccesso("GET_ASSET", "Recupero asset id=" + id);
+        securityLogger.logAccesso("GET_ASSET", "Recupero asset id=" + id + " da " + auth.getName());
 
         return assetService.trovaPerId(id)
                 .map(asset -> ResponseEntity.ok(AssetResponseDTO.fromEntity(asset)))
@@ -63,11 +57,14 @@ public class AssetController {
     }
 
     @PostMapping("/servers")
-    public ResponseEntity<AssetResponseDTO> creaServer(@Valid @RequestBody ServerDTO dto) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!"soc_admin".equals(auth.getName())) {
-            securityLogger.logViolazione("CREA_SERVER", "Operatore non autorizzato");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> creaServer(@Valid @RequestBody ServerDTO dto) {
+        // prima di salvare controllo che l'IP non sia già usato da un altro asset
+        // così evito duplicati nell'inventario
+        if (assetService.ipGiaUsato(dto.getIndirizzoIp())) {
+            securityLogger.logViolazione("CREA_SERVER", "Tentativo di duplicare IP " + dto.getIndirizzoIp());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("errore", "L'indirizzo IP è già registrato a un altro asset"));
         }
 
         Server server = new Server();
@@ -84,11 +81,12 @@ public class AssetController {
     }
 
     @PostMapping("/firewalls")
-    public ResponseEntity<AssetResponseDTO> creaFirewall(@Valid @RequestBody FirewallDTO dto) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!"soc_admin".equals(auth.getName())) {
-            securityLogger.logViolazione("CREA_FIREWALL", "Operatore non autorizzato");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> creaFirewall(@Valid @RequestBody FirewallDTO dto) {
+        if (assetService.ipGiaUsato(dto.getIndirizzoIp())) {
+            securityLogger.logViolazione("CREA_FIREWALL", "Tentativo di duplicare IP " + dto.getIndirizzoIp());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("errore", "L'indirizzo IP è già registrato a un altro asset"));
         }
 
         Firewall firewall = new Firewall();
@@ -105,13 +103,8 @@ public class AssetController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> eliminaAsset(@PathVariable Long id) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!"soc_admin".equals(auth.getName())) {
-            securityLogger.logViolazione("ELIMINA_ASSET", "Operatore non autorizzato per id=" + id);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
         if (!assetService.esiste(id)) {
             return ResponseEntity.notFound().build();
         }
