@@ -1,0 +1,347 @@
+{
+  "info": {
+    "name": "SOC Asset & Vulnerability Manager",
+    "description": "Collection completa per testare il back-end del progetto SOC Asset Manager. Imposta la variabile {{token}} dopo il login e verrà usata automaticamente in tutte le richieste autenticate.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticazione",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"soc_admin\",\n  \"password\": \"admin123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Analyst",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"soc_analyst\",\n  \"password\": \"analyst123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Viewer",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"soc_viewer\",\n  \"password\": \"viewer123\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Asset Inventory",
+      "item": [
+        {
+          "name": "Lista tutti gli asset",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/assets", "host": ["{{baseUrl}}"], "path": ["assets"]}
+          }
+        },
+        {
+          "name": "Dettaglio asset per ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/assets/1", "host": ["{{baseUrl}}"], "path": ["assets", "1"]}
+          }
+        },
+        {
+          "name": "Crea Server",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/assets/servers", "host": ["{{baseUrl}}"], "path": ["assets", "servers"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"indirizzoIp\": \"192.168.1.10\",\n  \"sistemaOperativo\": \"Linux Ubuntu 22.04\",\n  \"hostname\": \"srv-web-prod-01\",\n  \"ruolo\": \"Web Server\",\n  \"ambiente\": \"Produzione\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Crea Firewall",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/assets/firewalls", "host": ["{{baseUrl}}"], "path": ["assets", "firewalls"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"indirizzoIp\": \"192.168.1.1\",\n  \"sistemaOperativo\": \"FortiOS 7.4\",\n  \"marca\": \"Fortinet\",\n  \"firmware\": \"7.4.2\",\n  \"zona\": \"DMZ\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Elimina asset",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/assets/1", "host": ["{{baseUrl}}"], "path": ["assets", "1"]}
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Ticket Vulnerabilità",
+      "item": [
+        {
+          "name": "Lista tutti i ticket",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/tickets", "host": ["{{baseUrl}}"], "path": ["tickets"]}
+          }
+        },
+        {
+          "name": "Lista con filtri (gravità + stato)",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {
+              "raw": "{{baseUrl}}/tickets?gravita=CRITICAL&stato=OPEN&sortBy=id&direction=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["tickets"],
+              "query": [
+                {"key": "gravita", "value": "CRITICAL"},
+                {"key": "stato", "value": "OPEN"},
+                {"key": "sortBy", "value": "id"},
+                {"key": "direction", "value": "desc"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Statistiche aggregate",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/tickets/stats", "host": ["{{baseUrl}}"], "path": ["tickets", "stats"]}
+          }
+        },
+        {
+          "name": "Dettaglio ticket per ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/tickets/1", "host": ["{{baseUrl}}"], "path": ["tickets", "1"]}
+          }
+        },
+        {
+          "name": "Ticket per asset",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/tickets/asset/1", "host": ["{{baseUrl}}"], "path": ["tickets", "asset", "1"]}
+          }
+        },
+        {
+          "name": "Crea nuovo ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/tickets", "host": ["{{baseUrl}}"], "path": ["tickets"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descrizione\": \"SQL Injection rilevata sull'endpoint di login porta 8080\",\n  \"gravita\": \"CRITICAL\",\n  \"assetId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Cambia stato ticket (state machine)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/tickets/1/stato", "host": ["{{baseUrl}}"], "path": ["tickets", "1", "stato"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stato\": \"IN_PROGRESS\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Elimina ticket",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/tickets/1", "host": ["{{baseUrl}}"], "path": ["tickets", "1"]}
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. AI Mitigation (Gemini)",
+      "item": [
+        {
+          "name": "Genera piano di mitigazione AI",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/ai/mitigate/1", "host": ["{{baseUrl}}"], "path": ["ai", "mitigate", "1"]}
+          }
+        },
+        {
+          "name": "Lista piani in attesa di revisione",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/ai/piani/pending", "host": ["{{baseUrl}}"], "path": ["ai", "piani", "pending"]}
+          }
+        },
+        {
+          "name": "Approva piano",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/ai/piani/1/revisione", "host": ["{{baseUrl}}"], "path": ["ai", "piani", "1", "revisione"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decisione\": \"APPROVED\",\n  \"note\": \"Piano valido, procedere con l'esecuzione\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Rifiuta piano",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/ai/piani/1/revisione", "host": ["{{baseUrl}}"], "path": ["ai", "piani", "1", "revisione"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decisione\": \"REJECTED\",\n  \"note\": \"Piano non applicabile all'infrastruttura corrente\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. CVE Search (NVD NIST)",
+      "item": [
+        {
+          "name": "Cerca CVE per keyword",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {
+              "raw": "{{baseUrl}}/cve/search?keyword=apache",
+              "host": ["{{baseUrl}}"],
+              "path": ["cve", "search"],
+              "query": [{"key": "keyword", "value": "apache"}]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. User Management",
+      "item": [
+        {
+          "name": "Profilo utente corrente",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/users/me", "host": ["{{baseUrl}}"], "path": ["users", "me"]}
+          }
+        },
+        {
+          "name": "Aggiorna profilo",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/users/me", "host": ["{{baseUrl}}"], "path": ["users", "me"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Mario\",\n  \"cognome\": \"Rossi\",\n  \"immagineProfilo\": \"https://i.pravatar.cc/150?u=admin\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Lista tutti gli utenti (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"]}
+          }
+        },
+        {
+          "name": "Registra nuovo utente (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/users/registra", "host": ["{{baseUrl}}"], "path": ["users", "registra"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nuovo_analyst\",\n  \"password\": \"password123\",\n  \"nome\": \"Luigi\",\n  \"cognome\": \"Verdi\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Cambia ruolo utente (ADMIN)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {"raw": "{{baseUrl}}/users/2/ruolo", "host": ["{{baseUrl}}"], "path": ["users", "2", "ruolo"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ruolo\": \"ANALYST\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
