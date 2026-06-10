@@ -2,11 +2,13 @@ package com.cyberdefense.assetmanager.controller;
 
 import com.cyberdefense.assetmanager.config.SecurityLogger;
 import com.cyberdefense.assetmanager.dto.AiMitigationResponseDTO;
+import com.cyberdefense.assetmanager.dto.RevisionePianoDTO;
 import com.cyberdefense.assetmanager.entity.PianoMitigazione;
 import com.cyberdefense.assetmanager.entity.TicketVulnerabilita;
 import com.cyberdefense.assetmanager.repository.PianoMitigazioneRepository;
 import com.cyberdefense.assetmanager.service.GeminiService;
 import com.cyberdefense.assetmanager.service.TicketService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -103,17 +105,13 @@ public class AiMitigationController {
 
     // solo l'admin può approvare o rifiutare un piano, è l'autorità di revisione
     // questo è il cuore del Human-in-the-Loop, qui l'umano firma la decisione
+    // ora uso un DTO tipizzato con validazione invece di una Map generica
     @PatchMapping("/piani/{pianoId}/revisione")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> revisionaPiano(@PathVariable Long pianoId, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> revisionaPiano(@PathVariable Long pianoId, @Valid @RequestBody RevisionePianoDTO dto) {
         Optional<PianoMitigazione> pianoOpt = pianoRepository.findById(pianoId);
         if (pianoOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
-        }
-
-        String decisione = body.get("decisione");
-        if (!"APPROVED".equals(decisione) && !"REJECTED".equals(decisione)) {
-            return ResponseEntity.badRequest().body(Map.of("errore", "Decisione deve essere APPROVED o REJECTED"));
         }
 
         PianoMitigazione piano = pianoOpt.get();
@@ -124,13 +122,13 @@ public class AiMitigationController {
         }
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        piano.setStato(decisione);
+        piano.setStato(dto.getDecisione());
         piano.setRevisionatoDa(auth.getName());
-        piano.setNoteRevisione(body.getOrDefault("note", ""));
+        piano.setNoteRevisione(dto.getNote() != null ? dto.getNote() : "");
         piano.setDataRevisione(LocalDateTime.now());
 
         PianoMitigazione salvato = pianoRepository.save(piano);
-        securityLogger.logModifica("REVISIONE_PIANO", "Piano id=" + pianoId + " " + decisione + " da " + auth.getName(), pianoId.toString());
+        securityLogger.logModifica("REVISIONE_PIANO", "Piano id=" + pianoId + " " + dto.getDecisione() + " da " + auth.getName(), pianoId.toString());
 
         return ResponseEntity.ok(Map.of(
                 "id", salvato.getId(),

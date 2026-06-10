@@ -1,5 +1,6 @@
 package com.cyberdefense.assetmanager.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,6 +22,9 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    // password hashata con BCrypt, mai serializzata nelle risposte JSON
+    // @JsonIgnore impedisce che finisca in un endpoint per errore, difesa in profondità
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
