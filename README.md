@@ -1,5 +1,7 @@
 # SOC Asset & Vulnerability Manager — Back-End
 
+![CI](https://github.com/andrejcacioppo92/soc-asset-manager/actions/workflows/ci.yml/badge.svg)
+
 Dashboard per Security Operations Center (SOC) con gestione inventario asset IT, ticketing vulnerabilità e piani di mitigazione generati da Intelligenza Artificiale.
 
 Progetto capstone full-stack per il corso di Cybersecurity presso EPICODE Institute of Technology.
