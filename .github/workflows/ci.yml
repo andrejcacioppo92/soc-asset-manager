@@ -42,6 +42,10 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # do il permesso di esecuzione a mvnw, su Windows si perde nel commit
+      - name: Rendi mvnw eseguibile
+        run: chmod +x ./mvnw
+
       # compilo ed eseguo i test
       # passo le variabili d'ambiente che application.properties si aspetta
       # il GEMINI_API_KEY è un valore fittizio: i test non chiamano davvero Gemini
