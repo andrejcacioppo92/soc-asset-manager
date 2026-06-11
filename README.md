@@ -1,6 +1,9 @@
 # SOC Asset & Vulnerability Manager — Back-End
 
 ![CI](https://github.com/andrejcacioppo92/soc-asset-manager/actions/workflows/ci.yml/badge.svg)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=andrejcacioppo92_soc-asset-manager&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=andrejcacioppo92_soc-asset-manager)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=andrejcacioppo92_soc-asset-manager&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=andrejcacioppo92_soc-asset-manager)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=andrejcacioppo92_soc-asset-manager&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=andrejcacioppo92_soc-asset-manager)
 
 Dashboard per Security Operations Center (SOC) con gestione inventario asset IT, ticketing vulnerabilità e piani di mitigazione generati da Intelligenza Artificiale.
 
