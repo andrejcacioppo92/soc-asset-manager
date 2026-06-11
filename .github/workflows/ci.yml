@@ -1,0 +1,54 @@
+name: CI Back-End
+
+# il workflow parte a ogni push e pull request sul branch main
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # avvio un PostgreSQL temporaneo come service container
+    # serve perché i test Spring caricano il contesto e si connettono al DB
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cyber_asset_db
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+        ports:
+          - 5432:5432
+        # aspetto che il DB sia pronto prima di far partire i test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # scarico il codice del repository
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      # installo Java 21 (Temurin, la stessa distribuzione che uso in locale)
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # compilo ed eseguo i test
+      # passo le variabili d'ambiente che application.properties si aspetta
+      # il GEMINI_API_KEY è un valore fittizio: i test non chiamano davvero Gemini
+      - name: Build e test con Maven
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/cyber_asset_db
+          DB_USERNAME: ci_user
+          DB_PASSWORD: ci_password
+          GEMINI_API_KEY: dummy-key-for-ci
+        run: ./mvnw verify
