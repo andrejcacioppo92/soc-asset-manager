@@ -15,13 +15,14 @@ In un SOC la prima difesa è sapere cosa proteggere. Questo back-end espone le A
 
 ## Stack Tecnologico
 
-- **Java 21** + **Spring Boot 4.0.3**
+- **Java 21** + **Spring Boot 4.0.6**
 - **Spring Security** con autenticazione **JWT stateless (HS256)**
 - **PostgreSQL** con **Spring Data JPA** e **Hibernate**
 - **Google Gemini 2.5 Flash** per la generazione dei piani di mitigazione
 - **NVD NIST API** per la ricerca di CVE pubbliche
 - **Maven** come build tool
 - **BCrypt** per l'hashing delle password
+- **Docker** + **Docker Compose** per la containerizzazione
 
 ## Architettura
 
@@ -103,7 +104,50 @@ Le Entity JPA non escono mai dal Service layer. Tutto ciò che entra ed esce dai
 - Maven (usa il wrapper `mvnw` incluso, non serve installare globalmente)
 - Account Google AI Studio per la chiave Gemini API ([crea qui](https://aistudio.google.com/apikey))
 
-## Configurazione
+## Configurazione (avvio locale)
 
 1. Clona il repository
-2. Crea il database PostgreSQL:
+2. Crea il database PostgreSQL eseguendo: `CREATE DATABASE cyber_asset_db;`
+3. Imposta le variabili d'ambiente necessarie all'avvio:
+
+- `DB_USERNAME` — utente del database PostgreSQL
+- `DB_PASSWORD` — password del database
+- `GEMINI_API_KEY` — chiave API di Google Gemini
+- `DB_URL` (opzionale) — URL JDBC del database, default `jdbc:postgresql://localhost:5432/cyber_asset_db`
+
+Per comodità è incluso uno script `start-dev.ps1` (gitignorato) che carica le variabili e avvia l'applicazione. È disponibile un file `.env.example` come modello.
+
+4. Avvia l'applicazione con il comando `.\mvnw spring-boot:run` — il back-end sarà disponibile su `http://localhost:8080`.
+
+## Avvio con Docker
+
+Il progetto è completamente containerizzato. Con Docker è possibile avviare back-end e database PostgreSQL insieme, senza installare Java o PostgreSQL in locale.
+
+### Prerequisiti
+- Docker Desktop installato e in esecuzione
+
+### Configurazione
+Copia il file di esempio con `copy .env.docker.example .env.docker`, poi apri `.env.docker` e imposta le credenziali del database e la chiave API di Google Gemini. Questo file è escluso da Git e non viene mai pubblicato.
+
+### Avvio
+Avvia tutto con il comando `docker compose --env-file .env.docker up --build`. Il comando costruisce l'immagine del back-end (multi-stage build) e avvia due container: il database PostgreSQL e l'applicazione Spring Boot. Il back-end attende che il database sia pronto (healthcheck) prima di avviarsi, e lo raggiunge tramite la rete interna di Docker. Una volta avviato, il back-end è disponibile su `http://localhost:8080`.
+
+### Arresto
+Ferma e rimuovi i container con `docker compose --env-file .env.docker down`. I dati del database persistono in un volume Docker dedicato tra un riavvio e l'altro.
+
+### Note di sicurezza
+- L'immagine usa un multi-stage build: la fase di compilazione (Maven + JDK) è separata dalla fase di runtime (solo JRE), riducendo dimensione e superficie d'attacco.
+- L'applicazione gira come utente non-root dedicato all'interno del container.
+- I segreti non sono mai inclusi nell'immagine né nel codice: vengono iniettati a runtime tramite variabili d'ambiente.
+
+## Sicurezza della Supply Chain (CI/CD)
+
+Il repository integra una pipeline di sicurezza continua:
+
+- **CI con GitHub Actions**: build e test automatici a ogni push, con PostgreSQL containerizzato come service
+- **SonarCloud**: analisi statica (SAST) automatica a ogni push, Security Rating A
+- **Dependabot**: scanning continuo delle dipendenze (SCA) con aggiornamenti automatici delle vulnerabilità note
+
+## Licenza
+
+Progetto realizzato a scopo didattico nell'ambito del percorso di Cybersecurity presso EPICODE Institute of Technology.
