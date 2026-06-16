@@ -1,0 +1,25 @@
+# configurazione di Dependabot per gli aggiornamenti automatici delle dipendenze
+# controlla sia le librerie Maven del back-end sia le action della pipeline CI
+version: 2
+updates:
+  # tiene aggiornate le dipendenze Java del progetto (pom.xml)
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # raggruppo gli aggiornamenti minori in un'unica pull request per non intasare
+    groups:
+      spring-e-librerie:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+  # tiene aggiornate le GitHub Actions usate nella pipeline CI
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
