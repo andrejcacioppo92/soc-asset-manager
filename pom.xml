@@ -28,6 +28,8 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<!-- forzo Tomcat 11.0.22 per chiudere le CVE non ancora incluse in Spring Boot 4.0.6 -->
+		<tomcat.version>11.0.22</tomcat.version>
 	</properties>
 	<dependencies>
 		<dependency>
