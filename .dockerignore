@@ -1,0 +1,25 @@
+# file di build locali, vengono rigenerati dentro il container
+target/
+
+# configurazione IDE, non serve nell'immagine
+.idea/
+*.iml
+
+# file Git
+.git/
+.gitignore
+.gitattributes
+
+# variabili d'ambiente e segreti, non devono MAI finire nell'immagine
+.env
+start-dev.ps1
+
+# documentazione e file CI, non servono per eseguire l'app
+docs/
+README.md
+HELP.md
+.github/
+
+# il Dockerfile stesso e questo file
+Dockerfile
+.dockerignore

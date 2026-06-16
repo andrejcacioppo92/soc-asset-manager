@@ -1,0 +1,41 @@
+# orchestra il back-end e il database PostgreSQL in due container collegati
+services:
+
+  # database PostgreSQL
+  db:
+    image: postgres:16
+    container_name: soc-db
+    environment:
+      POSTGRES_DB: cyber_asset_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    # volume per non perdere i dati quando il container si ferma
+    volumes:
+      - soc-db-data:/var/lib/postgresql/data
+    # healthcheck: il back-end parte solo quando il db è davvero pronto
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d cyber_asset_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # back-end Spring Boot
+  backend:
+    build: .
+    container_name: soc-backend
+    ports:
+      - "8080:8080"
+    environment:
+      # il back-end raggiunge il db usando il nome del servizio "db" come hostname
+      DB_URL: jdbc:postgresql://db:5432/cyber_asset_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    # il back-end aspetta che il db sia sano prima di avviarsi
+    depends_on:
+      db:
+        condition: service_healthy
+
+# volume nominato per la persistenza dei dati del database
+volumes:
+  soc-db-data:

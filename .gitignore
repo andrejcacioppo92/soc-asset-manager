@@ -2,7 +2,6 @@
 target/
 !**/src/main/**/target/
 !**/src/test/**/target/
-
 # IDE
 .idea/
 *.iws
@@ -23,19 +22,16 @@ target/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
-
 # Maven
 .mvn/wrapper/maven-wrapper.jar
-
 # Variabili d'ambiente e credenziali
 .env
 *.env
+.env.docker
 application-local.properties
-
 # Log
 *.log
 logs/
-
 # OS
 .DS_Store
 Thumbs.db
