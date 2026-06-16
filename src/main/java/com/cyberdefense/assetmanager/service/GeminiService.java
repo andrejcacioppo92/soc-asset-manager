@@ -1,9 +1,10 @@
 package com.cyberdefense.assetmanager.service;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
@@ -11,7 +12,7 @@ import java.util.Map;
 @Service
 public class GeminiService {
 
-    private final WebClient webClient;
+    private final RestClient restClient;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -25,7 +26,7 @@ public class GeminiService {
     private static final long DELAY_BASE_MS = 1500;
 
     public GeminiService() {
-        this.webClient = WebClient.builder()
+        this.restClient = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com/v1beta")
                 .build();
     }
@@ -51,13 +52,12 @@ public class GeminiService {
         Exception ultimoErrore = null;
         for (int tentativo = 1; tentativo <= MAX_TENTATIVI; tentativo++) {
             try {
-                Map response = webClient.post()
+                Map response = restClient.post()
                         .uri("/models/gemini-2.5-flash:generateContent?key=" + apiKey)
-                        .header("Content-Type", "application/json")
-                        .bodyValue(requestBody)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(requestBody)
                         .retrieve()
-                        .bodyToMono(Map.class)
-                        .block();
+                        .body(Map.class);
 
                 if (response != null && response.containsKey("candidates")) {
                     List<Map> candidates = (List<Map>) response.get("candidates");
@@ -71,7 +71,7 @@ public class GeminiService {
                 }
 
                 return "Errore: risposta vuota dal modello AI.";
-            } catch (WebClientResponseException e) {
+            } catch (RestClientResponseException e) {
                 ultimoErrore = e;
                 // se Gemini risponde 503 (sovraccarico) o 429 (rate limit) ha senso riprovare
                 // per altri errori (401, 400) non ha senso, esco subito
