@@ -92,14 +92,14 @@ I seguenti interventi sono pianificati per le prossime iterazioni di sviluppo. S
 
 **Finding di riferimento:** SAST MED-5 (CWE-693, ASVS V14.4)
 
-**Stato attuale:** alcuni header sono già presenti (`X-Frame-Options`, `X-Content-Type-Options`, `HSTS`, `Referrer-Policy`, `CSP`), ma la Content Security Policy attuale è minimale (`default-src 'self'; frame-ancestors 'none'`).
+**Stato attuale:** i security header di base sono già implementati in `SecurityConfig` (`X-Frame-Options: DENY`, `X-Content-Type-Options`, `HSTS` con includeSubDomains, `Referrer-Policy: no-referrer`, `X-XSS-Protection`, e una CSP). Anche il CORS è già ristretto a origin e header specifici. Quello che manca è il raffinamento: la Content Security Policy attuale è minimale (`default-src 'self'; frame-ancestors 'none'`).
 
 **Intervento pianificato:**
 - Estendere la CSP con direttive granulari: `script-src`, `style-src`, `img-src`, `connect-src`
 - Aggiungere `Permissions-Policy` per disabilitare geolocation, camera, microfono
 - Consolidare la configurazione CORS in un unico `CorsConfigurationSource`, evitando la doppia configurazione attuale (`http.cors` + bean `CorsFilter`)
 
-**Ragione del rinvio:** intervento estetico nella gestione (consolidamento CORS) che non aggiunge sicurezza ma migliora la manutenibilità. La CSP estesa va testata nel browser per evitare di bloccare risorse legittime.
+**Ragione del rinvio:** intervento di raffinamento che migliora la manutenibilità (consolidamento CORS) e la granularità della CSP. La CSP estesa va testata nel browser per evitare di bloccare risorse legittime.
 
 ### 5. Validazione enum su gravità e stato dei ticket
 
@@ -107,14 +107,12 @@ I seguenti interventi sono pianificati per le prossime iterazioni di sviluppo. S
 
 **Finding di riferimento:** SAST MED-6 (CWE-20, ASVS V5.1)
 
-**Stato attuale:** i campi `gravita` e `stato` di `TicketVulnerabilita` sono `enum` nell'entity, ma la validazione del DTO accetta stringhe libere prima della conversione.
+**Stato attuale:** sostanzialmente risolto. Il campo `gravita` nel `TicketDTO` è tipizzato direttamente come enum `Gravita` (non come stringa libera): Spring rifiuta automaticamente con 400 qualsiasi valore non appartenente all'enum durante la deserializzazione, prima che il dato raggiunga la logica di business. Stesso meccanismo per il campo `stato` nel relativo DTO di cambio stato. La validazione di sicurezza è quindi garantita a livello strutturale.
 
-**Intervento pianificato:**
-- Aggiungere `@Pattern(regexp = "CRITICAL|HIGH|MEDIUM|LOW")` sul DTO di creazione ticket
-- Aggiungere `@Pattern(regexp = "OPEN|IN_PROGRESS|RESOLVED|CLOSED")` sul DTO di cambio stato (già presente nel relativo controller)
-- Restituire 400 Bad Request con messaggio chiaro in caso di valore non valido
+**Possibile miglioria residua:**
+- Personalizzare il messaggio di errore restituito al client in caso di valore enum non valido (attualmente è il messaggio generico di deserializzazione), per una migliore developer experience lato front-end
 
-**Ragione del rinvio:** il sistema funziona correttamente perché la conversione enum lato Hibernate fallisce con 400 in caso di valore non valido, ma il messaggio di errore non è ideale per il client.
+**Ragione del rinvio:** è un miglioramento di usabilità, non di sicurezza. La protezione contro input non validi è già effettiva.
 
 ### 6. Global Exception Handler
 
@@ -153,8 +151,49 @@ Per l'audit SAST è stata utilizzata un'analisi assistita da AI con prompt strut
 - OWASP ASVS 4.0.3
 - CVSS 4.0 stimato
 
+A complemento dell'analisi assistita da AI, il repository integra anche scanner automatici continui: **SonarCloud** per il SAST a ogni push e **GitHub Dependabot** per la Software Composition Analysis (vedi sezione dedicata).
+
 L'approccio è descritto nel documento di prompt engineering allegato al portfolio del progetto.
+
+## Software Composition Analysis (SCA)
+
+Oltre all'analisi del codice proprietario (SAST), il progetto è stato sottoposto a un'analisi delle dipendenze di terze parti (Software Composition Analysis) tramite **GitHub Dependabot**, integrato come scanning continuo nel repository.
+
+### Risultato iniziale
+
+La prima scansione completa ha rilevato **62 vulnerabilità** nelle dipendenze transitive e dirette:
+
+- CRITICAL: 5
+- HIGH: 28
+- MODERATE: 21
+- LOW: 8
+
+La quasi totalità di queste vulnerabilità non era nel codice scritto, ma nelle librerie tirate dentro automaticamente da Spring Boot e dalle dipendenze dichiarate. Questo evidenzia un punto metodologico importante: SAST e DAST analizzano il codice e il comportamento runtime, ma non vedono le CVE annidate nell'albero delle dipendenze. La SCA copre questo angolo cieco.
+
+### Interventi di remediation
+
+Le vulnerabilità sono state chiuse con un approccio ragionato, distinguendo gli aggiornamenti necessari da quelli rischiosi e privilegiando la riduzione della superficie d'attacco rispetto al semplice inseguimento delle patch.
+
+1. **Aggiornamento di Spring Boot da 4.0.3 a 4.0.6** (patch sullo stesso ramo minore, basso rischio di regressione) e di JJWT da 0.12.5 a 0.12.7. Questo ha chiuso circa metà delle vulnerabilità.
+
+2. **Rimozione completa della dipendenza WebFlux/Netty.** Il `GeminiService` usava `WebClient` (basato su Netty) per una singola chiamata REST sincrona a Google Gemini. Netty trascinava da solo decine di CVE pur non essendo necessario: l'applicazione è un monolite MVC su Tomcat, non un servizio reattivo. Il servizio è stato riscritto usando `RestClient` (il client HTTP sincrono di Spring, basato su Tomcat già presente), mantenendo identica la logica di business (stesso prompt, stesso retry con exponential backoff, stessa gestione errori). La rimozione di Netty ha eliminato alla radice tutte le relative vulnerabilità, riducendo la superficie d'attacco invece di rincorrere aggiornamenti.
+
+3. **Aggiornamento mirato di Apache Tomcat a 11.0.22** tramite override della property `tomcat.version`. Spring Boot 4.0.6 includeva ancora Tomcat 11.0.21, l'ultima versione affetta da 7 CVE (di cui 3 critiche: autenticazione Digest bypassabile, mancata validazione header HTTP/2, security constraint non applicati correttamente). La 11.0.22 le risolve tutte.
+
+4. **Aggiornamento del driver PostgreSQL JDBC a 42.7.11** per chiudere CVE-2026-42198 (Denial of Service via iterazioni PBKDF2 illimitate durante l'autenticazione SCRAM). Dipendenza diretta, aggiornata con versione esplicita nel `pom.xml`.
+
+### Decisioni di rischio documentate
+
+- **Rifiuto dell'aggiornamento a Spring Boot 4.1.0** proposto automaticamente da Dependabot. Si tratta di un salto di versione minore (non una patch) rilasciato pochi giorni prima, che introduce nuove funzionalità e potenziali breaking change senza risolvere alcuna vulnerabilità aperta. Aggiornare a ridosso della consegna avrebbe introdotto rischio di regressione senza beneficio di sicurezza. La pull request è stata chiusa consapevolmente.
+
+- **Riconoscimento di un falso positivo su JJWT** (CVE-2024-31033), verificato come disputato/ritirato tramite il GitHub Advisory Database prima di agire. L'aggiornamento a 0.12.7 lo ha comunque reso irrilevante.
+
+### Risultato finale
+
+Al termine della remediation: **0 vulnerabilità aperte, 62 chiuse.** Ogni intervento è stato validato dalla pipeline CI (build e test automatici con PostgreSQL containerizzato) prima del merge, garantendo che nessun aggiornamento rompesse la funzionalità esistente.
+
+L'intero processo ha rafforzato un principio operativo: la sicurezza delle dipendenze non si gestisce accettando ciecamente ogni aggiornamento proposto, ma valutando caso per caso necessità, rischio e impatto, e preferendo la rimozione del codice non necessario quando possibile.
 
 ## Conclusioni
 
-Il progetto soddisfa **parzialmente** OWASP ASVS 4.0.3 Livello L2, con una postura coerente con le aspettative per un progetto universitario di portfolio. I gap residui sono documentati e prioritizzati. Nessuna vulnerabilità critica o ad alto impatto è stata identificata dopo gli interventi di hardening.
+Il progetto soddisfa **parzialmente** OWASP ASVS 4.0.3 Livello L2, con una postura coerente con le aspettative per un progetto universitario di portfolio. I gap residui sono documentati e prioritizzati. Nessuna vulnerabilità critica o ad alto impatto è stata identificata dopo gli interventi di hardening, e l'analisi delle dipendenze (SCA) è stata portata a zero vulnerabilità aperte.
