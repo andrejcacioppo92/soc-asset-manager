@@ -97,6 +97,12 @@
 			<version>0.12.7</version>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Rate limiting sull'endpoint di login (Bucket4j, token bucket in-memory) -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-core</artifactId>
+			<version>8.19.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>
