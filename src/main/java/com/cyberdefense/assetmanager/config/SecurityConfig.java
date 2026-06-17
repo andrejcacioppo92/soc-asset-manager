@@ -11,8 +11,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
@@ -29,7 +29,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.cors(Customizer.withDefaults())
+        // collego il CORS all'unico CorsConfigurationSource definito sotto, niente più doppia configurazione
+        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
@@ -45,10 +46,25 @@ public class SecurityConfig {
                                 .includeSubDomains(true)
                                 .maxAgeInSeconds(31536000)
                         )
-                        // CSP, dice al browser da quali domini accettare risorse
-                        // restringo a self per evitare XSS da script esterni
+                        // CSP con direttive granulari, restringo ogni tipo di risorsa a self
+                        // connect-src include le origin del front-end per non bloccare le sue chiamate
                         .contentSecurityPolicy(csp -> csp
-                                .policyDirectives("default-src 'self'; frame-ancestors 'none'")
+                                .policyDirectives(
+                                        "default-src 'self'; " +
+                                                "script-src 'self'; " +
+                                                "style-src 'self' 'unsafe-inline'; " +
+                                                "img-src 'self' data:; " +
+                                                "connect-src 'self' http://localhost:5173; " +
+                                                "font-src 'self'; " +
+                                                "object-src 'none'; " +
+                                                "base-uri 'self'; " +
+                                                "form-action 'self'; " +
+                                                "frame-ancestors 'none'"
+                                )
+                        )
+                        // disabilito API del browser che l'app non usa, riduce la superficie di attacco lato client
+                        .permissionsPolicyHeader(permissions -> permissions
+                                .policy("geolocation=(), camera=(), microphone=(), payment=()")
                         )
                         // non mando referer a siti esterni, riduce data leakage involontario
                         .referrerPolicy(ref -> ref
@@ -69,9 +85,9 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // unica fonte di configurazione CORS, sostituisce il vecchio bean CorsFilter separato
     @Bean
-    public CorsFilter corsFilter() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowCredentials(true);
@@ -81,8 +97,11 @@ public class SecurityConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         // evito che il browser esponga header sensibili al JS
         config.setExposedHeaders(List.of());
+        // riduco i preflight tenendo in cache la policy per un'ora
+        config.setMaxAge(3600L);
 
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+        return source;
     }
 }
