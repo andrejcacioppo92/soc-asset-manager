@@ -48,11 +48,13 @@ jobs:
 
       # compilo ed eseguo i test
       # passo le variabili d'ambiente che application.properties si aspetta
-      # il GEMINI_API_KEY è un valore fittizio: i test non chiamano davvero Gemini
+      # GEMINI_API_KEY e JWT_SECRET sono valori fittizi solo per la CI: i test non li usano davvero
+      # JWT_SECRET deve comunque essere un Base64 valido perché il JwtService lo decodifica all'avvio
       - name: Build e test con Maven
         env:
           DB_URL: jdbc:postgresql://localhost:5432/cyber_asset_db
           DB_USERNAME: ci_user
           DB_PASSWORD: ci_password
           GEMINI_API_KEY: dummy-key-for-ci
+          JWT_SECRET: Y2ktdGVzdC1zZWNyZXQtbm90LWZvci1wcm9kdWN0aW9uLWp1c3QtdG8tYm9vdC1zcHJpbmctY29udGV4dC1pbi1jaQ==
         run: ./mvnw verify
