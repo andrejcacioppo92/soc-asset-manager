@@ -1,6 +1,6 @@
 # Security Roadmap
 
-Questo documento traccia lo stato della postura di sicurezza del progetto SOC Asset & Vulnerability Manager. Riassume i risultati dell'audit SAST condotto sul codice sorgente, gli interventi di hardening già applicati e gli interventi pianificati per le prossime iterazioni di sviluppo.
+Questo documento traccia lo stato della postura di sicurezza del progetto SOC Asset & Vulnerability Manager. Riassume i risultati dell'audit SAST condotto sul codice sorgente, gli interventi di hardening applicati e gli interventi ancora pianificati per le prossime iterazioni di sviluppo.
 
 L'approccio adottato è quello di un ciclo iterativo: identificare le vulnerabilità tramite scanner statici, applicare le patch a basso rischio nell'immediato, e documentare le restanti come backlog di sicurezza con priorità e razionale tecnico.
 
@@ -8,20 +8,20 @@ L'approccio adottato è quello di un ciclo iterativo: identificare le vulnerabil
 
 Il progetto ha come target di riferimento **OWASP ASVS 4.0.3 Livello L2**.
 
-Dopo l'audit SAST e i fix applicati, la postura risulta:
+Dopo l'audit SAST e gli interventi di hardening, la postura risulta:
 
-- **Soddisfatto:** V3 (architettura stateless), V4 (access control per ruolo a livello metodo), V7 (logging di sicurezza), V2.4 (hashing BCrypt delle password), buona gestione dell'output AI lato front-end, state machine dei piani con anti-retroattività.
-- **Gap residui:** V2.2 (anti-automation), V6 (key management JWT), V14.4 (header HTTP), V5 (validazione enum su alcuni campi), LLM01 (sanitizzazione prompt).
+- **Soddisfatto:** V2.2 (anti-automation via rate limiting sul login), V2.4 (hashing BCrypt delle password), V3 (architettura stateless), V4 (access control per ruolo a livello metodo), V6 (key management JWT con segreto da ambiente e claim completi), V7 (logging di sicurezza ed error handling centralizzato), V14.4 (header HTTP di sicurezza), buona gestione dell'output AI lato front-end, state machine dei piani con anti-retroattività.
+- **Gap residui:** LLM01 (sanitizzazione prompt verso Gemini), affinamenti minori sulla CSP e messaggistica di errore enum.
 
 Risultato sintetico dell'audit:
 
 - CRITICAL: 0
 - HIGH: 0 confermati
-- MEDIUM: 6 (documentati di seguito)
+- MEDIUM: 6 (in larga parte risolti, dettaglio di seguito)
 - LOW: 10 circa
 - INFO/advisory: 6 circa
 
-## Interventi già applicati
+## Interventi già applicati (post-audit immediato)
 
 Le seguenti patch sono state implementate al termine dell'audit, in quanto a basso rischio di regressione e ad alto impatto sulla sicurezza:
 
@@ -31,44 +31,37 @@ Le seguenti patch sono state implementate al termine dell'audit, in quanto a bas
 4. **Centralizzazione dell'URL API nel front-end** tramite `import.meta.env.VITE_API_BASE_URL` con fallback su localhost. Eliminate le URL hardcoded da 6 file React, ora il deployment può cambiare ambiente senza modifiche al codice (CWE-547).
 5. **Retry con exponential backoff** sulle chiamate a Google Gemini in `GeminiService`. Gestisce 503 e 429 con tre tentativi (1.5s, 3s, 6s) prima di propagare l'errore. Migliora la resilienza in caso di sovraccarico temporaneo del provider AI.
 
-## Backlog di sicurezza
+## Interventi di hardening completati (seconda iterazione)
 
-I seguenti interventi sono pianificati per le prossime iterazioni di sviluppo. Sono stati identificati durante l'audit e classificati come "improvements" piuttosto che "fix urgenti": non rappresentano vulnerabilità sfruttabili in produzione nell'attuale modello operativo (utenza interna, deployment locale, dati non sensibili), ma costituiscono debt di sicurezza da chiudere prima di un'esposizione pubblica del servizio.
+I seguenti interventi, inizialmente a backlog, sono stati implementati, testati in locale e validati dalla pipeline CI prima del merge.
 
-### 1. JWT hardening completo
-
-**Priorità:** Alta
+### JWT hardening completo — COMPLETATO
 
 **Finding di riferimento:** SAST MED-1 (CWE-320), SAST MED-2 (CWE-345, CWE-613)
 
-**Stato attuale:** la chiave HS256 è generata casualmente in RAM all'avvio del server. È crittograficamente forte (non forgeable) ma volatile: ogni restart invalida tutti i token emessi, e in deployment multi-istanza ogni nodo avrebbe una chiave diversa rompendo lo stateless. Inoltre il token contiene solo i claim minimi (`sub`, `iat`, `exp`).
+**Cosa è stato fatto:** la chiave HS256 non è più generata casualmente in RAM ma caricata da variabile d'ambiente `JWT_SECRET` (Base64), decodificata correttamente e usata via `Keys.hmacShaKeyFor()`. Il token ora include i claim standard `iss` (issuer), `aud` (audience), `jti` (id univoco) e `nbf` (not before). Il parsing è centralizzato in un unico metodo che valida issuer e audience (`requireIssuer`, `requireAudience`) e applica una tolleranza di clock skew di 30 secondi. Il segreto è escluso dal versionamento e iniettato via ambiente sia in locale (`start-dev.ps1`) che in Docker (`.env.docker`), con segnaposto nei rispettivi file `.example`.
 
-**Intervento pianificato:**
-- Caricare la chiave da variabile d'ambiente `JWT_SECRET` (Base64, almeno 256 bit)
-- Aggiungere i claim standard: `iss` (issuer), `aud` (audience), `jti` (token id univoco), `nbf` (not before)
-- Validare `iss` e `aud` nel parser
-- Aggiungere `clockSkewSeconds(30)` per tolleranza tra server con clock leggermente disallineati
-- Consolidare il parsing in un singolo punto per evitare doppio parsing nel filtro
-
-**Ragione del rinvio:** intervento che tocca un punto critico (la firma del token) e richiede invalidazione globale delle sessioni. Va fatto in una finestra di manutenzione concordata, non in coda a un audit.
-
-### 2. Rate limiting sull'endpoint di login
-
-**Priorità:** Alta
+### Rate limiting sull'endpoint di login — COMPLETATO
 
 **Finding di riferimento:** SAST MED-3 (CWE-307)
 
-**Stato attuale:** nessun limite al numero di tentativi di login. Un attaccante con accesso di rete al back-end può tentare brute-force illimitati.
+**Cosa è stato fatto:** integrata la libreria Bucket4j (token bucket in-memory) tramite un `RateLimitingFilter` basato su `OncePerRequestFilter`, applicato solo all'endpoint `/api/auth/login`. Limite di 5 tentativi al minuto per indirizzo IP, con bucket separato per IP così che un attaccante non possa bloccare gli utenti legittimi. Al superamento del limite viene restituito un 429 con messaggio generico. Verificato in test: i primi 5 tentativi passano, dal sesto scatta il 429, e un login legittimo torna possibile una volta ricaricato il bucket.
 
-**Intervento pianificato:**
-- Integrare la libreria Bucket4j per il rate limiting
-- Configurare 5 tentativi per IP per minuto sull'endpoint `/api/auth/login`
-- Aggiungere lockout temporaneo dell'account dopo N tentativi falliti consecutivi
-- Loggare i tentativi sospetti per analisi successive
+### HTTP Security Headers e consolidamento CORS — COMPLETATO
 
-**Ragione del rinvio:** richiede una nuova dipendenza Maven e una configurazione di stato condivisa (necessaria per il rate limiting in eventuali deployment multi-istanza). Da valutare se usare Bucket4j in-memory o backato da Redis.
+**Finding di riferimento:** SAST MED-5 (CWE-693, ASVS V14.4)
 
-### 3. Mitigazione Prompt Injection su Gemini
+**Cosa è stato fatto:** la Content Security Policy è stata estesa da una direttiva minimale a un set granulare (`default-src`, `script-src`, `style-src`, `img-src`, `connect-src`, `font-src`, `object-src 'none'`, `base-uri`, `form-action`, `frame-ancestors 'none'`). Aggiunta una `Permissions-Policy` che disabilita geolocation, camera, microfono e payment. La configurazione CORS, prima duplicata (`http.cors` + bean `CorsFilter`), è stata consolidata in un unico `CorsConfigurationSource`, con origin e header ristretti a quelli effettivamente usati dal front-end e cache dei preflight. Verificato che il front-end continui a comunicare correttamente col back-end dopo il consolidamento.
+
+### Global Exception Handler — COMPLETATO
+
+**Cosa è stato fatto:** implementato un `@RestControllerAdvice` (`GlobalExceptionHandler`) che fa da rete di sicurezza centralizzata. Gestisce `MethodArgumentNotValidException` restituendo un 400 con i campi non validi (prima una violazione di `@Valid` poteva emergere come 403 fuorviante), `AccessDeniedException` con un 403 pulito, e un fallback generico che restituisce un 500 senza mai esporre stack trace al client (ASVS V7.4). Verificato in test: un input non valido ora restituisce correttamente 400 con dettaglio dei campi.
+
+## Backlog di sicurezza residuo
+
+I seguenti interventi restano pianificati per le prossime iterazioni.
+
+### Mitigazione Prompt Injection su Gemini
 
 **Priorità:** Media
 
@@ -86,46 +79,18 @@ I seguenti interventi sono pianificati per le prossime iterazioni di sviluppo. S
 
 **Ragione del rinvio:** richiede test di efficacia contro payload di prompt injection, da fare in una sessione dedicata di adversarial testing.
 
-### 4. HTTP Security Headers completi
-
-**Priorità:** Media
-
-**Finding di riferimento:** SAST MED-5 (CWE-693, ASVS V14.4)
-
-**Stato attuale:** i security header di base sono già implementati in `SecurityConfig` (`X-Frame-Options: DENY`, `X-Content-Type-Options`, `HSTS` con includeSubDomains, `Referrer-Policy: no-referrer`, `X-XSS-Protection`, e una CSP). Anche il CORS è già ristretto a origin e header specifici. Quello che manca è il raffinamento: la Content Security Policy attuale è minimale (`default-src 'self'; frame-ancestors 'none'`).
-
-**Intervento pianificato:**
-- Estendere la CSP con direttive granulari: `script-src`, `style-src`, `img-src`, `connect-src`
-- Aggiungere `Permissions-Policy` per disabilitare geolocation, camera, microfono
-- Consolidare la configurazione CORS in un unico `CorsConfigurationSource`, evitando la doppia configurazione attuale (`http.cors` + bean `CorsFilter`)
-
-**Ragione del rinvio:** intervento di raffinamento che migliora la manutenibilità (consolidamento CORS) e la granularità della CSP. La CSP estesa va testata nel browser per evitare di bloccare risorse legittime.
-
-### 5. Validazione enum su gravità e stato dei ticket
+### Affinamento validazione enum (developer experience)
 
 **Priorità:** Bassa
 
 **Finding di riferimento:** SAST MED-6 (CWE-20, ASVS V5.1)
 
-**Stato attuale:** sostanzialmente risolto. Il campo `gravita` nel `TicketDTO` è tipizzato direttamente come enum `Gravita` (non come stringa libera): Spring rifiuta automaticamente con 400 qualsiasi valore non appartenente all'enum durante la deserializzazione, prima che il dato raggiunga la logica di business. Stesso meccanismo per il campo `stato` nel relativo DTO di cambio stato. La validazione di sicurezza è quindi garantita a livello strutturale.
+**Stato attuale:** la validazione di sicurezza è già garantita strutturalmente. Il campo `gravita` nel `TicketDTO` è tipizzato direttamente come enum `Gravita`: Spring rifiuta automaticamente con 400 qualsiasi valore non valido durante la deserializzazione, prima che il dato raggiunga la logica di business. Stesso meccanismo per il campo `stato`.
 
 **Possibile miglioria residua:**
 - Personalizzare il messaggio di errore restituito al client in caso di valore enum non valido (attualmente è il messaggio generico di deserializzazione), per una migliore developer experience lato front-end
 
 **Ragione del rinvio:** è un miglioramento di usabilità, non di sicurezza. La protezione contro input non validi è già effettiva.
-
-### 6. Global Exception Handler
-
-**Priorità:** Bassa
-
-**Stato attuale:** le eccezioni sono gestite localmente nei controller con try/catch. Funziona ma è ridondante.
-
-**Intervento pianificato:**
-- Implementare un `@RestControllerAdvice` con `GlobalExceptionHandler`
-- Centralizzare la gestione di `MethodArgumentNotValidException`, `AccessDeniedException`, `EntityNotFoundException`, `DataIntegrityViolationException`
-- Restituire response uniformi e sanificate (senza stack trace) come da ASVS V7.4
-
-**Ragione del rinvio:** refactoring puramente architetturale, non chiude vulnerabilità ma migliora la pulizia del codice.
 
 ## Note sulla metodologia di sicurezza
 
@@ -196,4 +161,4 @@ L'intero processo ha rafforzato un principio operativo: la sicurezza delle dipen
 
 ## Conclusioni
 
-Il progetto soddisfa **parzialmente** OWASP ASVS 4.0.3 Livello L2, con una postura coerente con le aspettative per un progetto universitario di portfolio. I gap residui sono documentati e prioritizzati. Nessuna vulnerabilità critica o ad alto impatto è stata identificata dopo gli interventi di hardening, e l'analisi delle dipendenze (SCA) è stata portata a zero vulnerabilità aperte.
+Il progetto soddisfa in larga misura OWASP ASVS 4.0.3 Livello L2, con una postura coerente con le aspettative per un progetto universitario di portfolio e diversi controlli a livello enterprise. Gli interventi di hardening prioritari (JWT, rate limiting, security headers, error handling) sono stati completati e validati dalla CI. I gap residui sono limitati, documentati e prioritizzati: riguardano principalmente la mitigazione del prompt injection verso l'LLM e affinamenti minori. L'analisi delle dipendenze (SCA) è stata portata a zero vulnerabilità aperte. Nessuna vulnerabilità critica o ad alto impatto risulta presente.
