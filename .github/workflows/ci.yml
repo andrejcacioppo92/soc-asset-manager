@@ -32,7 +32,7 @@ jobs:
     steps:
       # scarico il codice del repository
       - name: Checkout del codice
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # installo Java 21 (Temurin, la stessa distribuzione che uso in locale)
       - name: Setup Java 21
