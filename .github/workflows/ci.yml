@@ -36,7 +36,7 @@ jobs:
 
       # installo Java 21 (Temurin, la stessa distribuzione che uso in locale)
       - name: Setup Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
